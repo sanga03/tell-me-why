@@ -1,0 +1,12 @@
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:notificationTimeout="100"
+    android:canRetrieveWindowContent="true"
+
+    android:settingsActivity="com.example.ristricotr.MainActivity"
+    android:description="@string/accessibility_service_description"
+
+    android:packageNames="com.instagram.android,com.google.android.youtube,com.android.chrome"
+    />
+   

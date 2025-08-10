@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">Tell Me Why</string>
+
+        <!-- Other strings -->
+        <string name="accessibility_service_description">Your accessibility service description here</string>
+
+</resources>
