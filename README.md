@@ -1,4 +1,4 @@
-# TellMeWhy
+# Tell Me Why
 
 This App is gateway to  interrupt automatic digital habits. In a world where it's easy to slip into endless scrolling, this app introduces a moment of pause  a simple, thoughtful question: "Why are you opening that app?" By prompting users to reflect before engaging with potentially distracting apps, TellMeWhy encourages greater self-awareness and intentional use of technology. It's a small moment that can lead to more focused decisions, helping users break patterns of mindless usage.
 
@@ -36,6 +36,7 @@ A[Start: Android Application Running] --> B{Accessibility Service Detects App La
     J -- No --> L[End / Await Next App Launch];
 
     K --> L;
+    L --> B;
 ```
 ## How to Contribute
 
@@ -47,7 +48,8 @@ Contributions are welcome! If you'd like to contribute, please follow these guid
     git checkout -b feature/your-feature-name
     ```
 3.  **Make your changes.** Please adhere to the existing code style and architectural patterns.
-4.  **Ensure the app builds and runs** without any new errors or warnings.
-5.  **Create a Pull Request** with a clear and descriptive title and summary of your changes.
+4.  **Add OPENROUTER_API_KEY** to your local.properties
+5.  **Ensure the app builds and runs** without any new errors or warnings.
+6.  **Create a Pull Request** with a clear and descriptive title and summary of your changes.
 
 ---
