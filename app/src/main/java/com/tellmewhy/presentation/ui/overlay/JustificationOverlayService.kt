@@ -1,6 +1,7 @@
 package com.tellmewhy.presentation.ui.overlay
 
 import android.app.Service
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.PixelFormat
@@ -9,6 +10,7 @@ import android.os.IBinder
 import android.util.Log
 import android.view.Gravity
 import android.view.WindowManager
+import androidx.activity.result.launch
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -76,7 +78,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
 //import androidx.compose.material.icons.filled.Error // Error Icon
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.ui.draw.alpha
@@ -86,24 +87,66 @@ import androidx.compose.ui.graphics.scale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateTo
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.with
+import androidx.compose.foundation.gestures.snapTo
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.* // Keep existing layout imports
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.filled.Info // Or a more relevant icon
 import androidx.compose.material3.* // Keep existing Material3 imports
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.unit.coerceAtLeast
+import androidx.compose.ui.unit.coerceIn
 import androidx.compose.ui.unit.dp
 import com.tellmewhy.core.util.AppIcon // Import your AppIcon composable
 
 
 import com.tellmewhy.core.util.JustifyAppContent;
+import com.tellmewhy.presentation.ui.screen.PreferencesKeys
 import kotlinx.coroutines.delay
+import kotlin.math.cos
+import kotlin.math.sin
+
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.joinAll
+import kotlinx.coroutines.launch
+import kotlin.math.cos
+import kotlin.math.sin
+import androidx.compose.animation.core.Animatable
+import androidx.compose.runtime.remember
+
+
+// Keep PreferencesKeys here if specific to HomeScreen, or move to a general Constants.kt
+object PreferencesKeys {
+    const val PREFS_NAME = "home_screen_prefs"
+    const val PASS_COUNTER = "pass_counter"
+    const val LAST_INCREMENT_TIMESTAMP = "last_increment_timestamp"
+    const val AI_ENABLED = "ai_enabled"
+}
 
 class JustificationOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, SavedStateRegistryOwner {
     private val serviceJob = SupervisorJob()
@@ -210,6 +253,7 @@ class JustificationOverlayService : Service(), LifecycleOwner, ViewModelStoreOwn
 //                            stopSelf() // Stop the service after action
                         },
                         onCancel = {
+
                             Log.i(TAG, "Justification canceled for $packageName")
                             removeOverlay()
                             stopSelf() // Stop the service after action
@@ -267,6 +311,7 @@ class JustificationOverlayService : Service(), LifecycleOwner, ViewModelStoreOwn
     }
 
     private fun removeOverlay() {
+
         composeView?.let {
             if (it.parent != null) { // Check if it's actually added
                 try {
@@ -299,6 +344,107 @@ class JustificationOverlayService : Service(), LifecycleOwner, ViewModelStoreOwn
         const val EXTRA_PACKAGE_NAME = "extra_package_name"
     }
 }
+@Composable
+fun PassPopAnimation(
+    trigger: Boolean,
+    onAnimationFinished: () -> Unit = {} // Default empty lambda
+) {
+    val particleCount = 8
+    // Correct way to remember a list of Animatables.
+    // Each particle needs its own Animatable instance.
+    val particles = remember {
+        List(particleCount) { Animatable(0f) }
+    }
+
+    // This LaunchedEffect will re-run when `trigger` changes.
+    LaunchedEffect(key1 = trigger) {
+        val animationJobs = particles.mapIndexed { index, animatable ->
+            launch { // Launch a new coroutine for each particle's animation
+                animatable.snapTo(0f) // Reset to initial state before starting
+                delay(index * 30L)    // Stagger the start of each particle slightly
+
+                // Animate to 1f (e.g., full expansion / visibility)
+                animatable.animateTo(
+                    targetValue = 1.0f,
+                    animationSpec = tween(
+                        durationMillis = 500,
+                        easing = LinearOutSlowInEasing
+                    )
+                )
+                // Animate to 2f (e.g., to drive fade out and further shrinking)
+                animatable.animateTo(
+                    targetValue = 2.0f,
+                    animationSpec = tween(
+                        durationMillis = 300,
+                        easing = FastOutLinearInEasing
+                    )
+                )
+            }
+        }
+        animationJobs.joinAll() // Wait for all particle animations to complete
+        onAnimationFinished()   // Call the callback
+    }
+
+    Box(
+        contentAlignment = Alignment.Center,
+        // Ensure the Box itself doesn't clip the particles if they go outside
+        // You might need to adjust padding or size of the parent container if clipping occurs
+    ) {
+        particles.forEachIndexed { index, anim ->
+            // Current animation value (ranges from 0f to 2f based on the animation stages)
+            val animationValue = anim.value
+
+            // --- Calculate animation properties based on animationValue ---
+
+            // Progress for outward motion (0f to 1f as animationValue goes from 0f to 1f)
+            val outwardProgress = animationValue.coerceIn(0f, 1f)
+
+            // Progress for fade-out and secondary effects (0f to 1f as animationValue goes from 1f to 2f)
+            val fadeAndShrinkProgress = (animationValue - 1f).coerceIn(0f, 1f)
+
+            // Angle for distributing particles in a circle
+            val angleRad = Math.toRadians((360f / particleCount * index).toDouble())
+
+            // Radius: Particles move further out as outwardProgress increases
+            val currentRadius = 60.dp * outwardProgress // Max distance particles travel from center
+
+            // Alpha: Fade in during the first phase, fade out during the second
+            val alpha = if (animationValue <= 1f) {
+                outwardProgress // Fade in
+            } else {
+                1f - fadeAndShrinkProgress // Fade out
+            }.coerceIn(0f, 1f)
+
+            // Scale: Start at a base size, potentially shrink slightly as they move out,
+            // and shrink more significantly during the fade-out phase.
+            val scale = (1f - outwardProgress * 0.3f) * (1f - fadeAndShrinkProgress * 0.7f)
+            scale.coerceAtLeast(0.1f) // Ensure particles don't disappear entirely by scale
+
+            // Particle size: Can also be dynamic
+            val particleSize = (6.dp + (outwardProgress * 4).dp) * (1f - fadeAndShrinkProgress * 0.5f)
+            particleSize.coerceAtLeast(2.dp)
+
+
+            val offsetX = (currentRadius.value * cos(angleRad)).dp
+            val offsetY = (currentRadius.value * sin(angleRad)).dp
+
+            Box(
+                modifier = Modifier
+                    .offset(x = offsetX, y = offsetY)
+                    .graphicsLayer( // Prefer graphicsLayer for performance on these properties
+                        scaleX = scale,
+                        scaleY = scale,
+                        alpha = alpha
+                    )
+                    .size(particleSize)
+                    .background(
+                        color = MaterialTheme.colorScheme.tertiary, // Use a distinct color
+                        shape = CircleShape
+                    )
+            )
+        }
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class) // For FlowRow if needed
 @Composable
@@ -318,6 +464,15 @@ fun JustificationPrompt(
 
     val context = LocalContext.current
     var appNameFromPackage by remember(packageName) { mutableStateOf(packageName) }
+    val prefs = remember {
+        context.getSharedPreferences(PreferencesKeys.PREFS_NAME, Context.MODE_PRIVATE)
+    }
+
+    var showPassUsedAnimation by remember { mutableStateOf(false) }
+    var passUsedTrigger by remember { mutableStateOf(0) } // To re-trigger animation
+
+
+    var hourlyPassCount by remember { mutableStateOf(prefs.getInt(PreferencesKeys.PASS_COUNTER, 0)) }
 
     LaunchedEffect(packageName) {
         try {
@@ -499,24 +654,76 @@ fun JustificationPrompt(
                         Alignment.End
                     ) // Spacing and alignment
                 ) {
-                    val cancelInteractionSource = remember { MutableInteractionSource() }
-                    val isCancelPressed by cancelInteractionSource.collectIsPressedAsState()
-                    val cancelScale by animateFloatAsState(
-                        if (isCancelPressed) 0.95f else 1f,
-                        label = "CancelScale"
+                    val passButtonInteractionSource = remember { MutableInteractionSource() }
+                    val scope = rememberCoroutineScope()
+                    val isPassButtonPressed by passButtonInteractionSource.collectIsPressedAsState()
+                    val passButtonScale by animateFloatAsState(
+                        targetValue = if (isPassButtonPressed) 0.95f else 1f,
+                        animationSpec = spring(stiffness = Spring.StiffnessMedium),
+                        label = "PassButtonScale"
                     )
 
-                    TextButton(
-                        onClick = {
-                            outlinedTextError = null
-                            isLoading = false
-                            onCancel()
-                        },
-                        modifier = Modifier.scale(cancelScale),
-                        interactionSource = cancelInteractionSource,
-                        shape = MaterialTheme.shapes.medium // Consistent shape
-                    ) {
-                        Text("Avail Pass") // Standard TextButton look
+                    // For the particle animation, we'll draw directly on a Canvas or use multiple animated elements.
+                    // Let's use a simpler approach with multiple small animated circles for a "pop" effect.
+                    val particleAnimationTrigger = remember { mutableStateOf(false) }
+                    val passAnimationInProgress = remember { mutableStateOf(false) }
+
+
+                    Box(contentAlignment = Alignment.Center) { // Box to overlay particles
+                        Button(
+                            onClick = {
+                                if (hourlyPassCount > 0 && !passAnimationInProgress.value) {
+                                    outlinedTextError = null
+                                    isLoading = false // Ensure other loading state is reset
+
+                                    // Trigger animation
+                                    particleAnimationTrigger.value = !particleAnimationTrigger.value
+                                    passAnimationInProgress.value = true
+
+                                    // Actual pass usage logic
+                                    val newPassCount = hourlyPassCount - 1
+                                    prefs.edit()
+                                        .putInt(PreferencesKeys.PASS_COUNTER, newPassCount)
+                                        .apply()
+                                    // Update local state if it's not directly read from prefs or a ViewModel
+                                    // hourlyPassCount = newPassCount // Assuming hourlyPassCount is a mutableStateOf from SharedPreferences
+
+                                    // After a delay (for animation to finish), call onCancel
+                                    // This allows the animation to be seen before the dialog closes.
+                                    scope.launch {
+                                        delay(600) // Animation duration + small buffer
+                                        onCancel()
+                                        passAnimationInProgress.value = false
+                                    }
+                                } else if (hourlyPassCount <= 0) {
+                                    // Optionally, show a message that there are no passes
+                                    // e.g., using a Snackbar or Toast
+                                    Log.d("PassButton", "No passes left to avail.")
+                                }
+                            },
+                            modifier = Modifier
+                                .scale(passButtonScale)
+                                .padding(horizontal = 8.dp), // Add some padding if needed
+                            enabled = hourlyPassCount > 0 && !passAnimationInProgress.value,
+                            interactionSource = passButtonInteractionSource,
+                            shape = MaterialTheme.shapes.medium, // Or CircleShape for a round button
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.surface,
+                                contentColor = MaterialTheme.colorScheme.onSurface
+                            )
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("Avail Pass ($hourlyPassCount)")
+                            }
+                        }
+
+                        // Particle Pop Animation
+                        if (passAnimationInProgress.value) {
+                            PassPopAnimation(trigger = particleAnimationTrigger.value) {
+                                // This callback could be used if the animation itself needs to signal completion
+                                // For now, we use a fixed delay in the onClick.
+                            }
+                        }
                     }
 
                     val justifyInteractionSource = remember { MutableInteractionSource() }
@@ -576,7 +783,7 @@ fun JustificationPrompt(
                                     strokeWidth = 2.5.dp
                                 )
                             } else {
-                                Text("UNLOCK APP")
+                                Text("Unlock")
                             }
                         }
                     }

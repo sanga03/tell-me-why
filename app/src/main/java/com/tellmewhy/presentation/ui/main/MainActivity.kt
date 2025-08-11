@@ -20,6 +20,7 @@ import androidx.activity.result.launch
 import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -31,6 +32,7 @@ import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -261,37 +263,36 @@ fun AppListScreen(
     val context = LocalContext.current
     var showSystemApps by remember { mutableStateOf(false) }
 
-    val installedApps by remember(showSystemApps) {
+    val priorityPackageNames = remember {
+        listOf(
+            "com.instagram.android",
+            "com.google.android.youtube",
+            "com.android.chrome",
+            "com.instagram.lite",
+            "app.revanced.android.youtube",
+            "com.reddit.frontpage",
+            "com.instagram.barcelona"
+        )
+    }
+
+    val installedApps by remember { // Removed showSystemApps from remember key for now
         derivedStateOf {
             val pm = context.packageManager
-            val all_apps = pm.getInstalledApplications(PackageManager.GET_META_DATA)
-            Log.d("MainActivity", "all_apps: $all_apps")
-                all_apps
-                    .filter { appInfo ->
-                        // Criteria to consider an app "user-installed" or "launchable":
-                        // 1. It's not a system app OR
-                        // 2. It's an updated system app (system apps can be updated, becoming non-pristine system apps)
-                        // AND it has a launch intent (meaning it's launchable from the launcher).
+            val allApplications = pm.getInstalledApplications(PackageManager.GET_META_DATA)
+            Log.d("MainActivity", "Total applications found: ${allApplications.size}")
 
-                        val isSystemApp = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
-                        val isUpdatedSystemApp = (appInfo.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
-                        val hasLaunchIntent = pm.getLaunchIntentForPackage(appInfo.packageName) != null
+            val (priorityApps, otherApps) = allApplications
+                .filter { appInfo ->
+                    // Your existing filter logic for user-launchable apps
+                    val isSystemApp = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
+                    val isUpdatedSystemApp = (appInfo.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
+                    val hasLaunchIntent = pm.getLaunchIntentForPackage(appInfo.packageName) != null
 
-                        // Primary condition: Must have a launch intent to be user-facing
-                        if (!hasLaunchIntent) {
-                            // Log.v("AppListDebug", "Skipping (no launch intent): ${appInfo.packageName}")
-                            return@filter false
-                        }
-
-                        // If it has a launch intent, then decide based on system flags
-                        // We want apps that are NOT system apps OR are updated system apps
-                        // This generally gives a good list of user-interactable apps.
-                        val isUserApp = !isSystemApp || isUpdatedSystemApp
-                        // if (!isUserApp) {
-                        //    Log.v("AppListDebug", "Skipping (system app, not updated): ${appInfo.packageName}")
-                        // }
-                        isUserApp // Filter condition: must be a user app (or updated system app) AND have a launch intent
+                    if (!hasLaunchIntent) {
+                        return@filter false
                     }
+                    !isSystemApp || isUpdatedSystemApp
+                }
                 .mapNotNull { appInfo ->
                     try {
                         AppDetail(
@@ -300,15 +301,28 @@ fun AppListScreen(
                             icon = appInfo.loadIcon(pm)
                         )
                     } catch (e: Exception) {
-                        Log.e("AppListDebug", "Failed to map app: ${appInfo.packageName}", e) // Log the error
+                        Log.e("AppListDebug", "Failed to map app: ${appInfo.packageName}", e)
+                        // Fallback with a placeholder or skip if icon loading fails critically
                         AppDetail(
                             appName = appInfo.loadLabel(pm).toString(),
                             packageName = appInfo.packageName,
-                            icon = null
+                            icon = null // Or some default icon
                         )
                     }
                 }
-                .sortedBy { it.appName.lowercase() }
+                .partition { appDetail -> // Partition the list
+                    appDetail.packageName in priorityPackageNames
+                }
+
+            // Sort each list alphabetically by appName before combining
+            val sortedPriorityApps = priorityApps.sortedBy { it.appName.lowercase() }
+            val sortedOtherApps = otherApps.sortedBy { it.appName.lowercase() }
+
+            // Combine the lists: priority apps first, then other apps
+            val finalList = sortedPriorityApps + sortedOtherApps
+            Log.d("MainActivity", "Priority apps: ${sortedPriorityApps.joinToString { it.packageName }}")
+            Log.d("MainActivity", "Final list size: ${finalList.size}")
+            finalList
         }
     }
 

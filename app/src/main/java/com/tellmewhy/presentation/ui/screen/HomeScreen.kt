@@ -3,6 +3,7 @@ package com.tellmewhy.presentation.ui.screen // Or com.example.ristricotr.ui.scr
 // --- ALL THE IMPORTS needed for HomeScreen and MinuteLoopingBowlAnimation ---
 import android.content.Context
 import android.content.SharedPreferences
+import android.util.Log
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
@@ -24,9 +25,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.edit
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
@@ -244,21 +247,44 @@ fun HomeScreen() {
         }
         lifecycleOwner.lifecycle.addObserver(observer)
 
-        val effectScope = CoroutineScope(SupervisorJob())
+        val effectScope = CoroutineScope(SupervisorJob() + Dispatchers.IO) // Perform SharedPreferences I/O off the main thread
         effectScope.launch {
-            while (true) {
-                delay(TimeUnit.MINUTES.toMillis(15))
+            while (true) { // Use isActive for better cancellation handling
+                // Use the current in-memory value of lastHourlyIncrementTimestamp
+                val currentLastTimestamp = lastHourlyIncrementTimestamp
                 val currentTime = System.currentTimeMillis()
-                if (TimeUnit.MILLISECONDS.toHours(currentTime - lastHourlyIncrementTimestamp) >= 1) {
-                    val newCount = hourlyPassCount + 1
-                    hourlyPassCount = newCount
-                    val newTimestamp = lastHourlyIncrementTimestamp + TimeUnit.HOURS.toMillis(1)
-                    lastHourlyIncrementTimestamp = newTimestamp
-                    prefs.edit()
-                        .putInt(PreferencesKeys.PASS_COUNTER, newCount)
-                        .putLong(PreferencesKeys.LAST_INCREMENT_TIMESTAMP, newTimestamp)
-                        .apply()
+
+                Log.d("PassAccumulation", "COROUTINE CHECK: CurrentTime: $currentTime, KnownLastTimestamp: $currentLastTimestamp")
+
+                val hoursDifference = TimeUnit.MILLISECONDS.toHours(currentTime - currentLastTimestamp)
+                Log.d("PassAccumulation", "COROUTINE CHECK: HoursDifference: $hoursDifference")
+
+                if (hoursDifference >= 1) {
+                    // How many full hours have passed since our known last timestamp?
+                    val hoursToCatchUp = hoursDifference // Could be more than 1 if coroutine was delayed
+
+                    val passesToAdd = hoursToCatchUp.toInt()
+
+                    // Update the state variables
+                    val newPassCount = hourlyPassCount + passesToAdd
+                    val newLastTimestamp = currentLastTimestamp + TimeUnit.HOURS.toMillis(hoursToCatchUp)
+
+                    hourlyPassCount = newPassCount
+                    lastHourlyIncrementTimestamp = newLastTimestamp
+
+                    Log.d("PassAccumulation", "COROUTINE INCREMENT: PassesToAdd: $passesToAdd, NewCount: $newPassCount, NewLastTimestamp: $newLastTimestamp")
+
+                    // Save to SharedPreferences
+                    prefs.edit { // Use ktx extension for conciseness
+                        putInt(PreferencesKeys.PASS_COUNTER, newPassCount)
+                        putLong(PreferencesKeys.LAST_INCREMENT_TIMESTAMP, newLastTimestamp)
+                        // apply() is called automatically by prefs.edit { ... }
+                    }
+                } else {
+                    Log.d("PassAccumulation", "COROUTINE CHECK: No increment needed. Less than 1 hour since KnownLastTimestamp.")
                 }
+
+                delay(TimeUnit.MINUTES.toMillis(10)) // Your desired check interval
             }
         }
         onDispose {
@@ -304,28 +330,28 @@ fun HomeScreen() {
                 .padding(vertical = 16.dp),
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text("Enable AI Features", style = MaterialTheme.typography.titleMedium)
-                Switch(
-                    checked = isAiEnabled,
-                    onCheckedChange = { newValue ->
-                        isAiEnabled = newValue
-                        prefs.edit().putBoolean(PreferencesKeys.AI_ENABLED, newValue).apply()
-                    },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = MaterialTheme.colorScheme.primary,
-                        checkedTrackColor = MaterialTheme.colorScheme.primaryContainer,
-                        uncheckedThumbColor = MaterialTheme.colorScheme.outline,
-                        uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
-                    )
-                )
-            }
+//            Row(
+//                modifier = Modifier
+//                    .fillMaxWidth()
+//                    .padding(horizontal = 24.dp, vertical = 16.dp),
+//                verticalAlignment = Alignment.CenterVertically,
+//                horizontalArrangement = Arrangement.SpaceBetween
+//            ) {
+//                Text("Enable AI Features", style = MaterialTheme.typography.titleMedium)
+//                Switch(
+//                    checked = isAiEnabled,
+//                    onCheckedChange = { newValue ->
+//                        isAiEnabled = newValue
+//                        prefs.edit().putBoolean(PreferencesKeys.AI_ENABLED, newValue).apply()
+//                    },
+//                    colors = SwitchDefaults.colors(
+//                        checkedThumbColor = MaterialTheme.colorScheme.primary,
+//                        checkedTrackColor = MaterialTheme.colorScheme.primaryContainer,
+//                        uncheckedThumbColor = MaterialTheme.colorScheme.outline,
+//                        uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
+//                    )
+//                )
+//            }
         }
     }
 }
