@@ -7,7 +7,7 @@ import androidx.room.RoomDatabase
 import com.tellmewhy.data.local.dao.JustificationDao
 import com.tellmewhy.domain.model.JustificationEntry
 
-@Database(entities = [JustificationEntry::class], version = 1, exportSchema = false) // Increment version on schema changes
+@Database(entities = [JustificationEntry::class], version = 2, exportSchema = false) // Increment version on schema changes
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun justificationDao(): JustificationDao
@@ -23,7 +23,8 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "justification_database" // Name of your database file
                 )
-                    // .fallbackToDestructiveMigration() // Use this only during development if you don't want to provide migrations
+                    //                    .addMigrations(MIGRATION_1_2)
+//                    .fallbackToDestructiveMigration(true) // Use this only during development if you don't want to provide migrations
                     .build()
                 INSTANCE = instance
                 instance
