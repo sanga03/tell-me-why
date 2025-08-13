@@ -79,6 +79,5 @@ dependencies {
     implementation("io.coil-kt:coil-compose:2.5.0") // Or the latest version
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.6.2") // Or latest
     implementation("com.google.accompanist:accompanist-drawablepainter:0.32.0")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.0") // Use the latest stable version
 // Use the latest version
 }
