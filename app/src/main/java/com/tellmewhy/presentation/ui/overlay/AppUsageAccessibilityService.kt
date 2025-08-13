@@ -9,7 +9,6 @@ import android.os.Build
 import android.provider.Settings
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
-import com.tellmewhy.data.AppState
 import com.tellmewhy.presentation.ui.overlay.JustificationOverlayService
 private const val TRACKED_APPS_PREFS_NAME = "TrackedAppsPrefs"
 class AppUsageAccessibilityService : AccessibilityService() {
@@ -28,7 +27,7 @@ class AppUsageAccessibilityService : AccessibilityService() {
 
 
     // Keep track of the last app that triggered the overlay to avoid re-triggering immediately
-//    private var lastBlockedApp: String? = null
+    private var lastBlockedApp: String? = null
     private val COOLDOWN_PERIOD_MS = 2000 * 60 // 2 seconds
     private lateinit var trackedAppsPrefs: SharedPreferences
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -45,7 +44,7 @@ class AppUsageAccessibilityService : AccessibilityService() {
 
             if (packageName != null && initialTrackState) {
                 // Basic cooldown to prevent rapid re-triggering for the same app
-                if (packageName == AppState.lastBlockedAppPackageName &&
+                if (packageName == lastBlockedApp &&
                     (System.currentTimeMillis() - (lastOverlayTimeMillis[packageName]
                         ?: 0) < COOLDOWN_PERIOD_MS)
                 ) {
@@ -72,20 +71,17 @@ class AppUsageAccessibilityService : AccessibilityService() {
                 // If permission is granted (or pre-M), proceed to start the service:
                 Log.i(TAG, "Target app opened: $packageName. Overlay permission appears granted. Attempting to show overlay.")
 //                val intent = Intent(this, JustificationOverlayService::class.java).apply { /* ... */ }
-                AppState.updateLastBlockedApp(packageName)
-
-                // Update local map for cooldown specific to this service's logic
-                lastOverlayTimeMillis[packageName] = System.currentTimeMillis()
 
                 startService(intent)
+                lastBlockedApp = packageName
+                lastOverlayTimeMillis[packageName] = System.currentTimeMillis()
             } else if (packageName != null && !initialTrackState  &&  packageName != "com.tellmewhy") {
 //                Log.i(TAG,"package $packageName and $initialTrackState")
                 // If a non-target app is opened, reset the lastBlockedApp for that specific app
                 // This allows the overlay to show again if the user quickly switches back
-//                if (AppState.lastBlockedAppPackageName == packageName) {
-                    AppState.clearLastBlockedApp()
-//                }
-
+                if (lastBlockedApp == packageName) {
+                    lastBlockedApp = null
+                }
                 // This is a NON-TRACKED app OR potentially the keyboard
                 val className = event.className?.toString()
 

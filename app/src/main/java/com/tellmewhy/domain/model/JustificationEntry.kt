@@ -8,7 +8,6 @@ data class JustificationEntry(
     @PrimaryKey(autoGenerate = true)
     val id: Int = 0, // Auto-generated primary key
     val appName: String,
-    val packageName: String,
     val justificationText: String,
     val timestamp: Long // Store timestamp as Long (milliseconds since epoch)
 )

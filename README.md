@@ -13,30 +13,30 @@ The result is improved focus, reduced digital fatigue, and a more mindful relati
 
 ## Flow
 ```mermaid
-flowchart TD
- subgraph s1["Pass Genrator"]
-         AB["Pass Generator"] --> AC{"Generate one pass every one hour"}
-         AC --> AD
+graph TD
+A[Start: Android Application Running] --> B{Accessibility Service Detects App Launch};
 
-  end
-    A["Start: Android Application Running"] --> B{"Accessibility Service Detects App Launch"}
-    B --> C["Display Overlay Prompt for Justification"]
-    C --> D{"User Input"}
-    D -- Enter Justification Text --> E["AI Verification Process"]
-    D -- Use Pass --> AD["Passes"]
-    E --> F{"Is Justification Validated by AI?"}
-    F -- Yes --> G["Save Justification to Local Room Database"]
-    F -- No --> H["Display Invalid Justification Message & Re-prompt / Log Invalid Attempt"]
-    H --> C
-    G --> I["Justification Saved Successfully"]
-    I --> J{"User Views Historical Log?"}
-    J -- Yes --> K["Display Historical Log of Justifications"]
-    J -- No --> L["End / Await Next App Launch"]
-    K --> L
-    L --> B
-   
+    B --> C[Display Overlay Prompt for Justification];
 
-    AD@{ shape: cyl}
+    C --> D[User Enters Justification Text];
+
+    D --> E[AI Verification Process];
+
+    E --> F{Is Justification Validated by AI?};
+
+    F -- Yes --> G[Save Justification to Local Room Database];
+
+    F -- No --> H[Display Invalid Justification Message & Re-prompt / Log Invalid Attempt];
+    H --> C;
+
+    G --> I[Justification Saved Successfully];
+
+    I --> J{User Views Historical Log?};
+    J -- Yes --> K[Display Historical Log of Justifications];
+    J -- No --> L[End / Await Next App Launch];
+
+    K --> L;
+    L --> B;
 ```
 ## How to Contribute
 

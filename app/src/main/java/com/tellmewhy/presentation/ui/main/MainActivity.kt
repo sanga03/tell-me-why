@@ -16,6 +16,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.launch
+import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.size
@@ -23,6 +25,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Face
+import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.rounded.Home
@@ -33,9 +36,21 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import coil.compose.rememberAsyncImagePainter
 import com.tellmewhy.presentation.ui.theme.RistricotrTheme
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.launch
 import com.tellmewhy.presentation.ui.screen.HomeScreen
 // Keep this for app tracking status
 private const val TRACKED_APPS_PREFS_NAME = "TrackedAppsPrefs"
@@ -228,10 +243,7 @@ fun MainScaffold(
                     onOpenAccessibilitySettings = onOpenAccessibilitySettings
                 )
 
-                Screen.HomeScreen -> HomeScreen(
-                    onNavigateToAppList = { onScreenChange(Screen.AppList) },
-                    onNavigateToAllLogs = onViewLogsClicked
-                )
+                Screen.HomeScreen -> HomeScreen()
             }
         }
     }
