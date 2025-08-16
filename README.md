@@ -5,11 +5,15 @@ This App is gateway to  interrupt automatic digital habits. In a world where it'
 The result is improved focus, reduced digital fatigue, and a more mindful relationship with your device — one that supports your productivity, not undermines it.
 
 ## Features
-*   Track application launches using Android's Accessibility Service.
-*   Display an overlay prompt to enter a justification.
-*   Uses AI to verify the justification process
-*   Save justifications to a local Room database.
-*   View a historical log of all justifications.
+* Gatekeeps User from Opening Apps by asking for valid justification.
+* Limits User from using / doom scrolling app with invalid justification.
+* Gives provision usage of hourly earned "PASS", so that even passes are limited and only can be availed on reward bases.
+* Uses AI to validate justification.
+* Provides Historical Log of Justifications.
+
+![justification prompt](assets/justification_prompt.jpeg)
+![dashboard](assets/dashboard.jpeg)]
+
 
 ## Flow
 ```mermaid
@@ -55,5 +59,7 @@ Contributions are welcome! If you'd like to contribute, please follow these guid
 ---
 
 ## Privacy Policy
-Your privacy is important to us. Please review our [Privacy Policy](PRIVACY_POLICY.md) to understand how the app handles your data (spoiler: it's all local and we respect your privacy!).
+Your privacy is important to us. Please review our [Privacy Policy](assets/PRIVACY_POLICY.md) to understand how the app handles your data (spoiler: it's all local and we respect your privacy!).
 
+## Installation Guide
+Please rever [Installation Guide](assets/INSTALLATION_GUIDE.md) for more details in setting the app.
