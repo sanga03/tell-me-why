@@ -11,8 +11,9 @@ The result is improved focus, reduced digital fatigue, and a more mindful relati
 * Uses AI to validate justification.
 * Provides Historical Log of Justifications.
 
-![justification prompt](assets/justification_prompt.jpeg)
-![dashboard](assets/dashboard.jpeg)]
+**Screenshots:**
+*   [View Justification Prompt Example](assets/justification_prompt.jpeg)
+*   [View Dashboard Example](assets/dashboard.jpeg)
 
 
 ## Flow
