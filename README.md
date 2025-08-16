@@ -53,3 +53,7 @@ Contributions are welcome! If you'd like to contribute, please follow these guid
 6.  **Create a Pull Request** with a clear and descriptive title and summary of your changes.
 
 ---
+
+## Privacy Policy
+Your privacy is important to us. Please review our [Privacy Policy](PRIVACY_POLICY.md) to understand how the app handles your data (spoiler: it's all local and we respect your privacy!).
+
