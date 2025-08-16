@@ -33,6 +33,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
 
@@ -249,9 +250,9 @@ fun HomeScreen() {
 
         val effectScope = CoroutineScope(SupervisorJob() + Dispatchers.IO) // Perform SharedPreferences I/O off the main thread
         effectScope.launch {
-            while (true) { // Use isActive for better cancellation handling
-                // Use the current in-memory value of lastHourlyIncrementTimestamp
-                val currentLastTimestamp = lastHourlyIncrementTimestamp
+            while (isActive) { // Use isActive for better cancellation handling in a real app
+                val currentLastTimestamp = lastHourlyIncrementTimestamp // Use in-memory value
+
                 val currentTime = System.currentTimeMillis()
 
                 Log.d("PassAccumulation", "COROUTINE CHECK: CurrentTime: $currentTime, KnownLastTimestamp: $currentLastTimestamp")

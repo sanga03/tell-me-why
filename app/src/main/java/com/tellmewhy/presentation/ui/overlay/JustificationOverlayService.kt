@@ -138,6 +138,10 @@ import kotlin.math.cos
 import kotlin.math.sin
 import androidx.compose.animation.core.Animatable
 import androidx.compose.runtime.remember
+import com.tellmewhy.data.AppState
+import kotlinx.coroutines.withContext
+import java.util.concurrent.TimeUnit
+import kotlin.coroutines.cancellation.CancellationException
 
 
 // Keep PreferencesKeys here if specific to HomeScreen, or move to a general Constants.kt
@@ -146,6 +150,7 @@ object PreferencesKeys {
     const val PASS_COUNTER = "pass_counter"
     const val LAST_INCREMENT_TIMESTAMP = "last_increment_timestamp"
     const val AI_ENABLED = "ai_enabled"
+    const val LAST_RESET_TIMESTAMP = "last_reset_timestamp"
 }
 
 class JustificationOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, SavedStateRegistryOwner {
@@ -213,39 +218,76 @@ class JustificationOverlayService : Service(), LifecycleOwner, ViewModelStoreOwn
                             val entry = JustificationEntry(appName = packageName, justificationText = justification , timestamp = System.currentTimeMillis())
                             // For testing, you might want to see both values
                             serviceScope.launch {
+                                Log.d(TAG, "onJustify: serviceScope started on ${Thread.currentThread().name}")
+                                var successInScope = false
+                                var errorMsgInScope: String? = null
+                                var shouldStopService = false
+
                                 try {
-                                    val response: String? = JustifyAppContent(packageName, entry)
-                                    Log.d("JustificationPrompt", "API Response: $response")
+                                    Log.d(TAG, "onJustify: In serviceScope try block, before JustifyAppContent")
+                                    val response: String? = JustifyAppContent(packageName, entry) // Network/DB call
+                                    Log.d("JustificationPrompt", "onJustify: API Response: $response")
 
                                     val parts = response?.split(":", limit = 2)
                                     val code = parts?.getOrNull(0)
                                     val message = parts?.getOrNull(1)
 
                                     if (code == "ALLOW") {
-                                        Log.i(TAG, "Access ALLOWED for $packageName. Message: $message")
+                                        Log.i(TAG, "onJustify: Access ALLOWED. Saving to DB.")
                                         database.justificationDao().insertJustification(entry)
-                                        Log.i(TAG, "Justification saved.")
-                                        removeOverlay()
-                                        stopSelf()
+                                        Log.i(TAG, "onJustify: Justification saved.")
+                                        AppState.updateLastBlockedApp(packageName)
+                                        successInScope = true
+                                        shouldStopService = true
                                     } else if (code == "DENY") {
-                                        Log.w(TAG, "Access DENIED for $packageName. Reason: $message")
-                                        // RE-SHOW THE OVERLAY WITH THE ERROR MESSAGE
-                                        // The current composeView will be recomposed due to initialErrorMessage change
-                                        this@JustificationOverlayService.initialErrorMessage = message ?: "Justification denied by server."
-                                        // No need to call showOverlay again explicitly if initialErrorMessage
-                                        // is a mutableStateOf observed by the Composable.
-                                        // However, if the composable isn't recomposing correctly,
-                                        // you might need to force it by calling showOverlay(packageName, message)
-                                        // but that would recreate the ComposeView.
-                                        // A better approach is to ensure JustificationPrompt reacts to initialError.
-                                        this@JustificationOverlayService.initialStateLoad = false
+                                        Log.w(TAG, "onJustify: Access DENIED. Reason: $message")
+                                        errorMsgInScope = message ?: "Justification denied by server."
                                     } else {
-                                        Log.e(TAG, "Unknown response from server: $response")
-                                        this@JustificationOverlayService.initialErrorMessage = "Unexpected server response."
+                                        Log.e(TAG, "onJustify: Unknown response from server: $response")
+                                        errorMsgInScope = "Unexpected server response."
                                     }
+                                } catch (e: CancellationException) {
+                                    Log.e(TAG, "onJustify: serviceScope BACKGROUND PART CANCELLED", e)
+                                    throw e // Important to re-throw
                                 } catch (e: Exception) {
-                                    Log.e(TAG, "Error during justification or DB save: ${e.message}", e)
-                                    this@JustificationOverlayService.initialErrorMessage = "Error: ${e.message}"
+                                    Log.e(TAG, "onJustify: Error during BACKGROUND Justification or DB save: ${e.message}", e)
+                                    errorMsgInScope = "Error: ${e.message}" // Capture error to show on UI
+                                }
+
+                                // This part will always be attempted unless the coroutine was cancelled above.
+                                Log.d(TAG, "onJustify: About to switch to Dispatchers.Main. Success: $successInScope, Error: $errorMsgInScope, Stop: $shouldStopService")
+                                try {
+                                    withContext(Dispatchers.Main) {
+                                        Log.d(TAG, "onJustify: Switched to Dispatchers.Main on ${Thread.currentThread().name}")
+                                        try {
+                                            if (successInScope) {
+                                                Log.d(TAG, "onJustify: Main thread - removing overlay for success.")
+                                                removeOverlay()
+                                            } else {
+                                                Log.d(TAG, "onJustify: Main thread - updating error message: $errorMsgInScope")
+                                                this@JustificationOverlayService.initialErrorMessage = errorMsgInScope
+                                                this@JustificationOverlayService.initialStateLoad = false
+                                            }
+                                            if (shouldStopService) {
+                                                Log.d(TAG, "onJustify: Main thread - stopping service.")
+                                                stopSelf()
+                                            }
+                                            Log.d(TAG, "onJustify: Finished Main thread operations.")
+                                        } catch (e: Exception) {
+                                            Log.e(TAG, "onJustify: Exception INSIDE Dispatchers.Main block", e)
+                                            // You might want a fallback UI update here for critical errors
+                                            this@JustificationOverlayService.initialErrorMessage = "Critical Main Thread Error: ${e.message}"
+                                        }
+                                    }
+                                    Log.d(TAG, "onJustify: After withContext(Dispatchers.Main)")
+                                } catch (e: CancellationException) {
+                                    Log.e(TAG, "onJustify: serviceScope MAIN PART (withContext) CANCELLED", e)
+                                    throw e // Important to re-throw
+                                } catch (e: Exception) {
+                                    // This would catch an error if withContext itself failed, which is rare.
+                                    Log.e(TAG, "onJustify: Error switching to or in withContext(Dispatchers.Main) itself", e)
+                                } finally {
+                                    Log.d(TAG, "onJustify: serviceScope finally block reached for this justification.")
                                 }
                             }
                             // TODO: Actually store the justification with the package name
@@ -253,7 +295,7 @@ class JustificationOverlayService : Service(), LifecycleOwner, ViewModelStoreOwn
 //                            stopSelf() // Stop the service after action
                         },
                         onCancel = {
-
+                            AppState.updateLastBlockedApp(packageName)
                             Log.i(TAG, "Justification canceled for $packageName")
                             removeOverlay()
                             stopSelf() // Stop the service after action
@@ -471,8 +513,21 @@ fun JustificationPrompt(
     var showPassUsedAnimation by remember { mutableStateOf(false) }
     var passUsedTrigger by remember { mutableStateOf(0) } // To re-trigger animation
 
-
+    val currentTime = System.currentTimeMillis()
+    var lastHourlyIncrementTimestamp  by remember { mutableStateOf(prefs.getLong(PreferencesKeys.LAST_INCREMENT_TIMESTAMP, 0L)) }
     var hourlyPassCount by remember { mutableStateOf(prefs.getInt(PreferencesKeys.PASS_COUNTER, 0)) }
+
+    val hoursPassed = TimeUnit.MILLISECONDS.toHours(currentTime - lastHourlyIncrementTimestamp)
+    if (hoursPassed > 0) {
+        val newCount = hourlyPassCount + hoursPassed.toInt()
+        hourlyPassCount = newCount
+        val newTimestamp = lastHourlyIncrementTimestamp + TimeUnit.HOURS.toMillis(hoursPassed)
+        lastHourlyIncrementTimestamp = newTimestamp
+        prefs.edit()
+            .putInt(PreferencesKeys.PASS_COUNTER, newCount)
+            .putLong(PreferencesKeys.LAST_INCREMENT_TIMESTAMP, newTimestamp)
+            .apply()
+    }
 
     LaunchedEffect(packageName) {
         try {
