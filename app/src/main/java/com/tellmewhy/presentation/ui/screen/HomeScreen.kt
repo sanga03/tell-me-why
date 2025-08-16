@@ -54,6 +54,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
 import java.text.SimpleDateFormat
@@ -121,7 +122,7 @@ fun HomeScreen(
 
         val effectScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         effectScope.launch {
-            while (true) { // Use isActive for better cancellation handling in a real app
+            while (isActive) { // Use isActive for better cancellation handling in a real app
                 val currentLastTimestamp = lastHourlyIncrementTimestamp // Use in-memory value
                 val currentTime = System.currentTimeMillis()
                 val hoursDifference = TimeUnit.MILLISECONDS.toHours(currentTime - currentLastTimestamp)
