@@ -113,6 +113,7 @@ import com.tellmewhy.core.util.AppIcon // Import your AppIcon composable
 
 
 import com.tellmewhy.core.util.JustifyAppContent;
+import com.tellmewhy.presentation.ui.screen.PreferencesKeys
 import kotlinx.coroutines.delay
 import kotlin.math.cos
 import kotlin.math.sin
@@ -214,16 +215,7 @@ class JustificationOverlayService : Service(), LifecycleOwner, ViewModelStoreOwn
                         onJustify = { justification ->
                             initialErrorMessage = null // Reset for next attempt if needed
                             Log.i(TAG, "Justified: $justification for $packageName")
-                            var appNameFromPackage = packageName
-                            try {
-                                val appInfo =
-                                    context.packageManager.getApplicationInfo(packageName, 0)
-                                appNameFromPackage =
-                                    context.packageManager.getApplicationLabel(appInfo).toString()
-                            }catch (E: PackageManager.NameNotFoundException){
-
-                        }
-                                val entry = JustificationEntry(  appName = appNameFromPackage, packageName = packageName, justificationText = justification , timestamp = System.currentTimeMillis())
+                            val entry = JustificationEntry(appName = packageName, justificationText = justification , timestamp = System.currentTimeMillis())
                             // For testing, you might want to see both values
                             serviceScope.launch {
                                 Log.d(TAG, "onJustify: serviceScope started on ${Thread.currentThread().name}")

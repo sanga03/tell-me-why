@@ -1,54 +1,33 @@
-package com.tellmewhy.presentation.ui.screen
+package com.tellmewhy.presentation.ui.screen // Or com.example.ristricotr.ui.screens if you created a sub-package
 
+// --- ALL THE IMPORTS needed for HomeScreen and MinuteLoopingBowlAnimation ---
 import android.content.Context
-import androidx.compose.animation.core.animateIntAsState
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items // Correct import for LazyColumn items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Divider
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.collectAsState
+import android.content.SharedPreferences
+import android.util.Log
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.edit
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.tellmewhy.domain.model.JustificationEntry // Your Log Data Class
-import com.tellmewhy.presentation.ui.screen.*
-import com.tellmewhy.presentation.ui.log.JustificationLogViewModel // Your ViewModel
-import com.tellmewhy.presentation.ui.overlay.PreferencesKeys
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -57,50 +36,199 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
-// Place this function in a utility file or at the top level of your screen file if it's only used there.
-fun formatTimestamp(timestamp: Long, pattern: String = "MMM dd, yyyy 'at' hh:mm a"): String {
-    if (timestamp == 0L) return "N/A" // Or some other placeholder for invalid timestamps
-    return try {
-        val sdf = SimpleDateFormat(pattern, Locale.getDefault())
-        val date = Date(timestamp)
-        sdf.format(date)
-    } catch (e: Exception) {
-        // Log error or return a fallback string
-        "Invalid Date"
+// Keep PreferencesKeys here if specific to HomeScreen, or move to a general Constants.kt
+object PreferencesKeys {
+    const val PREFS_NAME = "home_screen_prefs"
+    const val PASS_COUNTER = "pass_counter"
+    const val LAST_INCREMENT_TIMESTAMP = "last_increment_timestamp"
+    const val AI_ENABLED = "ai_enabled"
+}
+
+@Composable
+fun MinuteLoopingJarAnimation(
+    modifier: Modifier = Modifier,
+    jarColor: Color = MaterialTheme.colorScheme.secondaryContainer,
+    liquidColor: Color = MaterialTheme.colorScheme.primary,
+    animationDurationMillis: Int = 60 * 1000 // 1 minute
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "minuteJarFillTransition")
+
+    val animatedFillLevel by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = animationDurationMillis, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "loopingJarFillLevel"
+    )
+
+    Canvas(modifier = modifier
+        .size(150.dp) // You can adjust this
+        .aspectRatio(0.7f)) { // Jars are often taller than they are wide
+        val canvasWidth = size.width
+        val canvasHeight = size.height
+
+        // --- Define Jar Shape ---
+        val rimHeight = canvasHeight * 0.05f
+        val neckHeight = canvasHeight * 0.1f
+        val shoulderHeight = canvasHeight * 0.1f
+        val bodyHeight = canvasHeight - rimHeight - neckHeight - shoulderHeight
+
+        val bodyWidth = canvasWidth * 0.9f
+        val neckWidth = canvasWidth * 0.6f
+        val rimWidth = canvasWidth * 0.65f // Rim slightly wider than neck
+
+        // Start drawing from top-left of the rim
+        val jarPath = Path().apply {
+            // Top Rim
+            moveTo( (canvasWidth - rimWidth) / 2, 0f)
+            lineTo((canvasWidth + rimWidth) / 2, 0f)
+            lineTo((canvasWidth + rimWidth) / 2, rimHeight)
+
+            // Neck (right side)
+            lineTo((canvasWidth + neckWidth) / 2, rimHeight + neckHeight)
+
+            // Shoulder (right side) - using an arc for a rounded shoulder
+            arcTo(
+                rect = Rect(
+                    left = (canvasWidth + neckWidth) / 2 - (bodyWidth - neckWidth), // control point to make it wide
+                    top = rimHeight + neckHeight,
+                    right = (canvasWidth + bodyWidth) / 2,
+                    bottom = rimHeight + neckHeight + shoulderHeight * 2 // Double for full arc effect
+                ),
+                startAngleDegrees = -90f, // Start from top
+                sweepAngleDegrees = 90f,  // Sweep to right
+                forceMoveTo = false
+            )
+
+            // Body (right side)
+            lineTo((canvasWidth + bodyWidth) / 2, rimHeight + neckHeight + shoulderHeight + bodyHeight)
+
+            // Base (simple rounded corners with arcs or straight line)
+            // For simplicity, a straight line for now, you can add arcs for rounded base corners
+            arcTo(
+                rect = Rect(
+                    left = (canvasWidth - bodyWidth) / 2,
+                    top = canvasHeight - (bodyWidth - ((canvasWidth - bodyWidth) / 2) )*0.2f - shoulderHeight*0.2f , //canvasHeight - shoulderHeight*0.5f,
+                    right = (canvasWidth + bodyWidth) / 2,
+                    bottom = canvasHeight + shoulderHeight*0.8f
+                ),
+                startAngleDegrees = 0f,
+                sweepAngleDegrees = 180f,
+                forceMoveTo = false
+            )
+
+
+            // Body (left side)
+            lineTo((canvasWidth - bodyWidth) / 2, rimHeight + neckHeight + shoulderHeight)
+
+
+            // Shoulder (left side)
+            arcTo(
+                rect = Rect(
+                    left = (canvasWidth - bodyWidth) / 2,
+                    top = rimHeight + neckHeight,
+                    right = (canvasWidth - neckWidth) / 2 + (bodyWidth - neckWidth) ,
+                    bottom = rimHeight + neckHeight + shoulderHeight * 2
+                ),
+                startAngleDegrees = 180f, // Start from left horizontal
+                sweepAngleDegrees = -90f,  // Sweep upwards
+                forceMoveTo = false
+            )
+
+
+            // Neck (left side)
+            lineTo((canvasWidth - neckWidth) / 2, rimHeight)
+            lineTo((canvasWidth - rimWidth) / 2, rimHeight) // Connect back to rim start
+            close() // Close the path
+        }
+
+        // Draw Jar outline
+        drawPath(
+            path = jarPath,
+            color = jarColor,
+            style = Stroke(width = 4f) // Adjust stroke width as needed
+        )
+
+        // --- Draw the Liquid ---
+        // Determine the fillable area (inside the body, below the neck roughly)
+        val fillableTopY = rimHeight + neckHeight + shoulderHeight * 0.5f // Start fill below shoulder curve
+        val fillableBottomY = canvasHeight - ( (bodyWidth - ((canvasWidth - bodyWidth) / 2) )*0.2f - shoulderHeight*0.2f )*0.5f // End fill just above the base curve start
+        val maxLiquidHeightInJar = fillableBottomY - fillableTopY
+
+        val liquidHeight = maxLiquidHeightInJar * animatedFillLevel
+        val liquidTopY = fillableBottomY - liquidHeight
+
+        // Path for the liquid (rectangle clipped by the jar)
+        val liquidRectPath = Path().apply {
+            addRect(
+                Rect(
+                    left = 0f, // Cover full width, clipping will handle shape
+                    top = liquidTopY,
+                    right = canvasWidth,
+                    bottom = fillableBottomY + 5f // Slightly overflow for clipping
+                )
+            )
+        }
+
+        // Optional: Gradient for the liquid
+        val liquidBrush = Brush.verticalGradient(
+            colors = listOf(liquidColor.copy(alpha = 0.7f), liquidColor),
+            startY = liquidTopY,
+            endY = fillableBottomY
+        )
+
+        // Clip drawing to the jar's shape before drawing the liquid
+        clipPath(jarPath) {
+            drawPath(
+                path = liquidRectPath,
+                brush = liquidBrush // Or use solid color: color = liquidColor
+            )
+        }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class) // For TopAppBar and Scaffold
+
+// --- Preview ---
+@Preview(showBackground = true)
 @Composable
-fun HomeScreen(
-    onNavigateToAppList: () -> Unit,
-    onNavigateToAllLogs: () -> Unit,
-    logViewModel: JustificationLogViewModel = viewModel() // Obtain ViewModel instance
-) {
+fun DefaultJarAnimationPreview() {
+    MaterialTheme {
+        MinuteLoopingJarAnimation(modifier = Modifier.size(150.dp, 214.dp)) // Approximate 0.7 aspect ratio
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun FastJarAnimationPreview() {
+    MaterialTheme {
+        MinuteLoopingJarAnimation(
+            modifier = Modifier.size(150.dp, 214.dp),
+            animationDurationMillis = 5000 // 5 seconds for fast preview
+        )
+    }
+}
+
+@Composable
+fun HomeScreen() {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val passCounterPrefs = remember {
+    val prefs = remember {
         context.getSharedPreferences(PreferencesKeys.PREFS_NAME, Context.MODE_PRIVATE)
     }
 
-    // --- State for Pass Counter ---
-    var hourlyPassCount by remember { mutableStateOf(passCounterPrefs.getInt(PreferencesKeys.PASS_COUNTER, 0)) }
+    var hourlyPassCount by remember { mutableStateOf(prefs.getInt(PreferencesKeys.PASS_COUNTER, 0)) }
     var lastHourlyIncrementTimestamp by remember {
-        mutableStateOf(passCounterPrefs.getLong(PreferencesKeys.LAST_INCREMENT_TIMESTAMP, System.currentTimeMillis()))
+        mutableStateOf(prefs.getLong(PreferencesKeys.LAST_INCREMENT_TIMESTAMP, System.currentTimeMillis()))
     }
     val animatedHourlyPassCount by animateIntAsState(
         targetValue = hourlyPassCount,
         label = "hourlyPassCountAnimation"
     )
+    var isAiEnabled by remember { mutableStateOf(prefs.getBoolean(PreferencesKeys.AI_ENABLED, false)) }
 
-    // --- Collect Justification Logs from ViewModel ---
-    val justificationLogs by logViewModel.allJustifications.collectAsState(initial = emptyList())
-
-    // --- Lifecycle and Coroutine Effects for Pass Counter ---
     DisposableEffect(key1 = lifecycleOwner, key2 = lastHourlyIncrementTimestamp) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
@@ -111,7 +239,7 @@ fun HomeScreen(
                     hourlyPassCount = newCount
                     val newTimestamp = lastHourlyIncrementTimestamp + TimeUnit.HOURS.toMillis(hoursPassed)
                     lastHourlyIncrementTimestamp = newTimestamp
-                    passCounterPrefs.edit()
+                    prefs.edit()
                         .putInt(PreferencesKeys.PASS_COUNTER, newCount)
                         .putLong(PreferencesKeys.LAST_INCREMENT_TIMESTAMP, newTimestamp)
                         .apply()
@@ -120,30 +248,44 @@ fun HomeScreen(
         }
         lifecycleOwner.lifecycle.addObserver(observer)
 
-        val effectScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val effectScope = CoroutineScope(SupervisorJob() + Dispatchers.IO) // Perform SharedPreferences I/O off the main thread
         effectScope.launch {
             while (isActive) { // Use isActive for better cancellation handling in a real app
                 val currentLastTimestamp = lastHourlyIncrementTimestamp // Use in-memory value
+
                 val currentTime = System.currentTimeMillis()
+
+                Log.d("PassAccumulation", "COROUTINE CHECK: CurrentTime: $currentTime, KnownLastTimestamp: $currentLastTimestamp")
+
                 val hoursDifference = TimeUnit.MILLISECONDS.toHours(currentTime - currentLastTimestamp)
+                Log.d("PassAccumulation", "COROUTINE CHECK: HoursDifference: $hoursDifference")
 
                 if (hoursDifference >= 1) {
-                    val hoursToCatchUp = hoursDifference
+                    // How many full hours have passed since our known last timestamp?
+                    val hoursToCatchUp = hoursDifference // Could be more than 1 if coroutine was delayed
+
                     val passesToAdd = hoursToCatchUp.toInt()
-                    val newPassCount = hourlyPassCount + passesToAdd // Update from current state
+
+                    // Update the state variables
+                    val newPassCount = hourlyPassCount + passesToAdd
                     val newLastTimestamp = currentLastTimestamp + TimeUnit.HOURS.toMillis(hoursToCatchUp)
 
-                    // Update state variables (will trigger recomposition)
                     hourlyPassCount = newPassCount
                     lastHourlyIncrementTimestamp = newLastTimestamp
 
+                    Log.d("PassAccumulation", "COROUTINE INCREMENT: PassesToAdd: $passesToAdd, NewCount: $newPassCount, NewLastTimestamp: $newLastTimestamp")
+
                     // Save to SharedPreferences
-                    passCounterPrefs.edit()
-                        .putInt(PreferencesKeys.PASS_COUNTER, newPassCount)
-                        .putLong(PreferencesKeys.LAST_INCREMENT_TIMESTAMP, newLastTimestamp)
-                        .apply()
+                    prefs.edit { // Use ktx extension for conciseness
+                        putInt(PreferencesKeys.PASS_COUNTER, newPassCount)
+                        putLong(PreferencesKeys.LAST_INCREMENT_TIMESTAMP, newLastTimestamp)
+                        // apply() is called automatically by prefs.edit { ... }
+                    }
+                } else {
+                    Log.d("PassAccumulation", "COROUTINE CHECK: No increment needed. Less than 1 hour since KnownLastTimestamp.")
                 }
-                delay(TimeUnit.MINUTES.toMillis(10)) // Check interval
+
+                delay(TimeUnit.MINUTES.toMillis(10)) // Your desired check interval
             }
         }
         onDispose {
@@ -152,154 +294,73 @@ fun HomeScreen(
         }
     }
 
-    // --- UI Structure ---
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Dashboard") },
-                actions = {
-                    IconButton(onClick = onNavigateToAllLogs) {
-                        Icon(Icons.Filled.Info, contentDescription = "View All Logs")
-                    }
-                    IconButton(onClick = onNavigateToAppList) {
-                        Icon(Icons.Filled.Menu, contentDescription = "App List")
-                    }
-                }
-            )
-        }
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues) // Apply padding from Scaffold
-                .padding(16.dp), // Additional overall padding
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp) // Spacing between direct children
-        ) {
-            // Passes Earned Card
-            PassesEarnedCard(count = animatedHourlyPassCount)
-
-            // Recent Justifications Section
-            RecentJustificationsSection(
-                logs = justificationLogs.take(5), // Show only the first 5 recent logs
-                modifier = Modifier.weight(1f) // Fills the remaining space
-            )
-
-            // You can add more sections/cards here if needed
-        }
-    }
-}
-
-@Composable
-fun PassesEarnedCard(count: Int) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .padding(24.dp)
-                .fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                "Passes Earned",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = "$count",
-                fontSize = 60.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                if (count == 1) "Pass" else "Passes",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
-
-@Composable
-fun RecentJustificationsSection(
-    logs: List<JustificationEntry>,
-    modifier: Modifier = Modifier // <--- Add modifier parameter
-) {
     Column(
-        modifier = modifier.fillMaxWidth() // Apply the passed modifier (which includes weight)
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.SpaceAround
     ) {
-        Text(
-            "Recent Justifications",
-            style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
-        if (logs.isEmpty()) {
-            Text(
-                "No justifications logged yet.",
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(vertical = 16.dp)
-            )
-        } else {
-            LazyColumn( // This LazyColumn will now fill the height given to its parent Column by weight
-                modifier = Modifier.fillMaxSize() // Fills the space given by the parent Column
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 16.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(24.dp)
+                    .fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                items(logs, key = { it.id }) { logEntry ->
-                    JustificationLogItem(logEntry)
-                    if (logs.last() != logEntry) {
-                        Divider(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
-                    }
-                }
+                Text("Passes Earned", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(modifier = Modifier.height(12.dp))
+                Text("$animatedHourlyPassCount", fontSize = 60.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(if (animatedHourlyPassCount == 1) "Pass" else "Passes", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+        }
+
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(vertical = 16.dp)) {
+            MinuteLoopingJarAnimation()
+        }
+
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 16.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        ) {
+//            Row(
+//                modifier = Modifier
+//                    .fillMaxWidth()
+//                    .padding(horizontal = 24.dp, vertical = 16.dp),
+//                verticalAlignment = Alignment.CenterVertically,
+//                horizontalArrangement = Arrangement.SpaceBetween
+//            ) {
+//                Text("Enable AI Features", style = MaterialTheme.typography.titleMedium)
+//                Switch(
+//                    checked = isAiEnabled,
+//                    onCheckedChange = { newValue ->
+//                        isAiEnabled = newValue
+//                        prefs.edit().putBoolean(PreferencesKeys.AI_ENABLED, newValue).apply()
+//                    },
+//                    colors = SwitchDefaults.colors(
+//                        checkedThumbColor = MaterialTheme.colorScheme.primary,
+//                        checkedTrackColor = MaterialTheme.colorScheme.primaryContainer,
+//                        uncheckedThumbColor = MaterialTheme.colorScheme.outline,
+//                        uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
+//                    )
+//                )
+//            }
         }
     }
 }
-@Composable
-fun JustificationLogItem(log: JustificationEntry) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 6.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Display appName
-                Text(
-                    text = log.appName, // Use appName here
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.weight(1f) // Allow app name to take space and wrap if long
-                )
-                Spacer(modifier = Modifier.width(8.dp)) // Add some space if appName is long
-                // Display formatted timestamp
-                Text(
-                    text = formatTimestamp(log.timestamp), // Format the Long timestamp
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
 
-            Text(
-                "Justification:", // Clearer label
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 2.dp)
-            )
-            Text(
-                log.justificationText,
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = 3
-            )
-        }
+@Preview(showBackground = true, widthDp = 360, heightDp = 640)
+@Composable
+fun DefaultHomeScreenWithBowlPreview() {
+    MaterialTheme {
+        HomeScreen()
     }
 }
