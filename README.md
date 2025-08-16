@@ -43,10 +43,15 @@ flowchart TD
 
     AD@{ shape: cyl}
 ```
-## How to Contribute
+## Ways to Contribute
 
-Contributions are welcome! If you'd like to contribute, please follow these guidelines:
+Contributions are welcome!
 
+#### Design or behavioral changes:
+1. All positive discussions on what the best way for user to control access ideas are welcome.
+2. Please feel free to open issues on the behaviour and design changes.
+
+#### Code changes:
 1.  **Fork the repository.**
 2.  **Create a new branch** for your feature or bug fix:
     ```bash
@@ -56,6 +61,9 @@ Contributions are welcome! If you'd like to contribute, please follow these guid
 4.  **Add OPENROUTER_API_KEY** to your local.properties
 5.  **Ensure the app builds and runs** without any new errors or warnings.
 6.  **Create a Pull Request** with a clear and descriptive title and summary of your changes.
+
+#### Issues:
+1. please feel free to open issues on the behaviour bugs or code issues.
 
 ---
 
