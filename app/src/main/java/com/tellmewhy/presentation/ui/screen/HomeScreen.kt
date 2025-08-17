@@ -154,17 +154,17 @@ fun HomeScreen(
     // --- UI Structure ---
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Dashboard") },
-                actions = {
-                    IconButton(onClick = onNavigateToAllLogs) {
-                        Icon(Icons.Filled.Info, contentDescription = "View All Logs")
-                    }
-                    IconButton(onClick = onNavigateToAppList) {
-                        Icon(Icons.Filled.Menu, contentDescription = "App List")
-                    }
-                }
-            )
+//            TopAppBar(
+//                title = { Text("Dashboard") },
+//                actions = {
+//                    IconButton(onClick = onNavigateToAllLogs) {
+//                        Icon(Icons.Filled.Info, contentDescription = "View All Logs")
+//                    }
+//                    IconButton(onClick = onNavigateToAppList) {
+//                        Icon(Icons.Filled.Menu, contentDescription = "App List")
+//                    }
+//                }
+//            )
         }
     ) { paddingValues ->
         Column(

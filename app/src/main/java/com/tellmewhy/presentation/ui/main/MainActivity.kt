@@ -23,6 +23,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Face
+import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.rounded.Home
@@ -32,9 +33,12 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.unit.dp
 import coil.compose.rememberAsyncImagePainter
+import com.tellmewhy.R
 import com.tellmewhy.presentation.ui.theme.RistricotrTheme
 import com.tellmewhy.presentation.ui.screen.HomeScreen
 // Keep this for app tracking status
@@ -165,50 +169,36 @@ fun MainScaffold(
                     )
                 },
                 actions = {
-                    if (currentScreen is Screen.AppList) { // Show these only on app list
+                    if (currentScreen !is Screen.PermissionSetup) {
                         IconButton(onClick = onViewLogsClicked) {
-                            Icon(Icons.Filled.Face, "View Logs")
+                            Icon(
+                                imageVector = ImageVector.vectorResource(id = R.drawable.ic_log_viewer),
+                                "View Logs"
+                            ) // Consider a more descriptive icon
                         }
                     }
-                    IconButton(onClick = { showMenu = !showMenu }) {
-                        Icon(Icons.Filled.MoreVert, "More options")
+                    if (currentScreen !is Screen.HomeScreen) {
+                        IconButton(onClick = { onScreenChange(Screen.HomeScreen) }) {
+                            Icon(Icons.Rounded.Home, contentDescription = "Home")
+                        }
                     }
-                    DropdownMenu(
-                        expanded = showMenu,
-                        onDismissRequest = { showMenu = false }
-                    ) {
-                        if (currentScreen !is Screen.PermissionSetup) {
-                            DropdownMenuItem(
-                                text = { Text("Setup Permissions") },
-                                onClick = {
-                                    onScreenChange(Screen.PermissionSetup)
-                                    showMenu = false
-                                },
-                                leadingIcon = { Icon(Icons.Filled.Settings, contentDescription = "Setup") }
-                            )
+                    // "Setup Permissions" button, shown if not on PermissionSetup screen
+
+
+                    // "App List" button, shown if not on AppList screen
+                    if (currentScreen !is Screen.AppList) {
+                        IconButton(onClick = { onScreenChange(Screen.AppList) }) {
+                            Icon(imageVector = ImageVector.vectorResource(id = R.drawable.ic_app_list), contentDescription = "App List")
                         }
-                        if (currentScreen !is Screen.AppList) {
-                            DropdownMenuItem(
-                                text = { Text("App List") },
-                                onClick = {
-                                    onScreenChange(Screen.AppList)
-                                    showMenu = false
-                                },
-                                leadingIcon = { Icon(Icons.Rounded.Menu, contentDescription = "list") }
-                            )
-                        }
-                        if (currentScreen !is Screen.HomeScreen) {
-                            DropdownMenuItem(
-                                text = { Text("Home") },
-                                onClick = {
-                                    onScreenChange(Screen.HomeScreen)
-                                    showMenu = false
-                                },
-                                leadingIcon = { Icon(Icons.Rounded.Home, contentDescription = "Home") }
-                            )
-                        }
-                        // Add other menu items if needed
                     }
+
+                    if (currentScreen !is Screen.PermissionSetup) {
+                        IconButton(onClick = { onScreenChange(Screen.PermissionSetup) }) {
+                            Icon(Icons.Filled.Settings, contentDescription = "Setup Permissions")
+                        }
+                    }
+
+
                 }
             )
         }
