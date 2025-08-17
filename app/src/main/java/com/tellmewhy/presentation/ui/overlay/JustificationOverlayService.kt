@@ -224,7 +224,7 @@ class JustificationOverlayService : Service(), LifecycleOwner, ViewModelStoreOwn
 
                                 try {
                                     Log.d(TAG, "onJustify: In serviceScope try block, before JustifyAppContent")
-                                    val response: String? = JustifyAppContent(packageName, entry) // Network/DB call
+                                    val response: String? = JustifyAppContent(packageName, entry, this@JustificationOverlayService) // Network/DB call
                                     Log.d("JustificationPrompt", "onJustify: API Response: $response")
 
                                     val parts = response?.split(":", limit = 2)

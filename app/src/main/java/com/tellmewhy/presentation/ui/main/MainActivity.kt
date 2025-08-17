@@ -41,6 +41,7 @@ import coil.compose.rememberAsyncImagePainter
 import com.tellmewhy.R
 import com.tellmewhy.presentation.ui.theme.RistricotrTheme
 import com.tellmewhy.presentation.ui.screen.HomeScreen
+import com.tellmewhy.presentation.ui.settings.SettingsScreen
 // Keep this for app tracking status
 private const val TRACKED_APPS_PREFS_NAME = "TrackedAppsPrefs"
 
@@ -49,6 +50,7 @@ sealed class Screen {
     object AppList : Screen()
     object PermissionSetup : Screen()
     object HomeScreen : Screen()
+    object SettingsScreen : Screen()
     // Add LogScreen here if you want to navigate to it within MainActivity
     // object LogView : Screen()
 }
@@ -103,6 +105,7 @@ class MainActivity : ComponentActivity() {
                     isAccessibilityServiceEnabled = isAccessibilitySvcEnabled,
                     onRequestOverlayPermission = ::requestOverlayPermission,
                     onOpenAccessibilitySettings = ::openAccessibilitySettings
+                    ,settingsPrefs = getSharedPreferences("settings_prefs", Context.MODE_PRIVATE)
                 )
             }
         }
@@ -152,7 +155,8 @@ fun MainScaffold(
     isOverlayPermissionGranted: Boolean,
     isAccessibilityServiceEnabled: Boolean,
     onRequestOverlayPermission: () -> Unit,
-    onOpenAccessibilitySettings: () -> Unit
+    onOpenAccessibilitySettings: () -> Unit,
+    settingsPrefs: SharedPreferences
 ) {
     var showMenu by remember { mutableStateOf(false) }
 
@@ -174,7 +178,7 @@ fun MainScaffold(
                             Icon(
                                 imageVector = ImageVector.vectorResource(id = R.drawable.ic_log_viewer),
                                 "View Logs"
-                            ) // Consider a more descriptive icon
+                            )
                         }
                     }
                     if (currentScreen !is Screen.HomeScreen) {
@@ -182,19 +186,20 @@ fun MainScaffold(
                             Icon(Icons.Rounded.Home, contentDescription = "Home")
                         }
                     }
-                    // "Setup Permissions" button, shown if not on PermissionSetup screen
-
-
-                    // "App List" button, shown if not on AppList screen
                     if (currentScreen !is Screen.AppList) {
                         IconButton(onClick = { onScreenChange(Screen.AppList) }) {
                             Icon(imageVector = ImageVector.vectorResource(id = R.drawable.ic_app_list), contentDescription = "App List")
                         }
                     }
-
                     if (currentScreen !is Screen.PermissionSetup) {
                         IconButton(onClick = { onScreenChange(Screen.PermissionSetup) }) {
                             Icon(Icons.Filled.Settings, contentDescription = "Setup Permissions")
+                        }
+                    }
+                    // Add settings icon
+                    if (currentScreen !is Screen.SettingsScreen) {
+                        IconButton(onClick = { onScreenChange(Screen.SettingsScreen) }) {
+                            Icon(Icons.Filled.Settings, contentDescription = "Settings")
                         }
                     }
 
@@ -209,18 +214,17 @@ fun MainScaffold(
                     trackedAppsPrefs = trackedAppsPrefs,
                     isOverlayGranted = isOverlayPermissionGranted,
                     isAccessibilityEnabled = isAccessibilityServiceEnabled
-                    // Removed onViewLogsClicked from here, handled by TopAppBar
                 )
-                is Screen.PermissionSetup -> PermissionSetupScreen(
+                Screen.HomeScreen -> HomeScreen(
+                    onNavigateToAppList = { onScreenChange(Screen.AppList) },
+                    onNavigateToAllLogs = onViewLogsClicked
+                )
+                Screen.SettingsScreen -> SettingsScreen(
+                    prefs = settingsPrefs,
                     isOverlayGranted = isOverlayPermissionGranted,
                     isAccessibilityEnabled = isAccessibilityServiceEnabled,
                     onRequestOverlayPermission = onRequestOverlayPermission,
                     onOpenAccessibilitySettings = onOpenAccessibilitySettings
-                )
-
-                Screen.HomeScreen -> HomeScreen(
-                    onNavigateToAppList = { onScreenChange(Screen.AppList) },
-                    onNavigateToAllLogs = onViewLogsClicked
                 )
             }
         }
