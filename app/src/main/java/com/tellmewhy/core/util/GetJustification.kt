@@ -1,5 +1,6 @@
 package com.tellmewhy.core.util
 
+import android.content.Context
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request

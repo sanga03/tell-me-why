@@ -48,7 +48,6 @@ private const val TRACKED_APPS_PREFS_NAME = "TrackedAppsPrefs"
 // Define navigation destinations
 sealed class Screen {
     object AppList : Screen()
-    object PermissionSetup : Screen()
     object HomeScreen : Screen()
     object SettingsScreen : Screen()
     // Add LogScreen here if you want to navigate to it within MainActivity
@@ -167,20 +166,20 @@ fun MainScaffold(
                     Text(
                         when (currentScreen) {
                             is Screen.AppList -> "Track Apps"
-                            is Screen.PermissionSetup -> "Setup Permissions"
+                            is Screen.SettingsScreen -> "Settings and  Permissions"
                             Screen.HomeScreen -> "Tell Me Why..!"
                         }
                     )
                 },
                 actions = {
-                    if (currentScreen !is Screen.PermissionSetup) {
+//                    if (currentScreen !is Screen.PermissionSetup) {
                         IconButton(onClick = onViewLogsClicked) {
                             Icon(
                                 imageVector = ImageVector.vectorResource(id = R.drawable.ic_log_viewer),
                                 "View Logs"
                             )
                         }
-                    }
+//                    }
                     if (currentScreen !is Screen.HomeScreen) {
                         IconButton(onClick = { onScreenChange(Screen.HomeScreen) }) {
                             Icon(Icons.Rounded.Home, contentDescription = "Home")
@@ -191,11 +190,11 @@ fun MainScaffold(
                             Icon(imageVector = ImageVector.vectorResource(id = R.drawable.ic_app_list), contentDescription = "App List")
                         }
                     }
-                    if (currentScreen !is Screen.PermissionSetup) {
-                        IconButton(onClick = { onScreenChange(Screen.PermissionSetup) }) {
-                            Icon(Icons.Filled.Settings, contentDescription = "Setup Permissions")
-                        }
-                    }
+//                    if (currentScreen !is Screen.PermissionSetup) {
+//                        IconButton(onClick = { onScreenChange(Screen.PermissionSetup) }) {
+//                            Icon(Icons.Filled.Settings, contentDescription = "Setup Permissions")
+//                        }
+//                    }
                     // Add settings icon
                     if (currentScreen !is Screen.SettingsScreen) {
                         IconButton(onClick = { onScreenChange(Screen.SettingsScreen) }) {
