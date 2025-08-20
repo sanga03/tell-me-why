@@ -141,7 +141,7 @@ import com.tellmewhy.data.AppState
 import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.cancellation.CancellationException
-
+import com.tellmewhy.common.JustificationEvents
 
 // Keep PreferencesKeys here if specific to HomeScreen, or move to a general Constants.kt
 object PreferencesKeys {
@@ -157,6 +157,7 @@ class JustificationOverlayService : Service(), LifecycleOwner, ViewModelStoreOwn
     private val serviceScope = CoroutineScope(Dispatchers.IO + serviceJob) // Use IO dispatcher for DB
     private val database by lazy { AppDatabase.getDatabase(this) } // Get DB instance
     private val TAG = "JustificationOverlay"
+    private var currentPackageName: String? = null
     private lateinit var windowManager: WindowManager
     private var composeView: ComposeView? = null
     private var initialErrorMessage: String? by mutableStateOf(null) // observable state
@@ -178,6 +179,9 @@ class JustificationOverlayService : Service(), LifecycleOwner, ViewModelStoreOwn
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        currentPackageName = intent?.getStringExtra(EXTRA_PACKAGE_NAME)
+        Log.d(TAG, "onStartCommand for package: $currentPackageName")
+
         if (!lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
             lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_START)
         }
@@ -186,6 +190,17 @@ class JustificationOverlayService : Service(), LifecycleOwner, ViewModelStoreOwn
         Log.d(TAG, "Overlay Service Started for $pkg")
         showOverlay(pkg)
         return START_NOT_STICKY // Changed from START_REDELIVER_INTENT if not critical to restart with same intent
+    }
+    private fun handleJustificationComplete(packageName: String) {
+        Log.d(TAG, "Justification handled for: $packageName. Sending broadcast.")
+        val broadcastIntent = Intent(JustificationEvents.ACTION_JUSTIFICATION_HANDLED).apply {
+            putExtra(JustificationEvents.EXTRA_PACKAGE_NAME, packageName)
+            // Optionally: putExtra(JustificationEvents.EXTRA_JUSTIFICATION_SUCCESS, true)
+        }
+        sendBroadcast(broadcastIntent) // Send the broadcast
+
+        // Important: Stop this service after its job is done to remove the overlay
+//        stopSelf()
     }
 
     private fun showOverlay(packageName: String) {
@@ -224,7 +239,7 @@ class JustificationOverlayService : Service(), LifecycleOwner, ViewModelStoreOwn
 
                                 try {
                                     Log.d(TAG, "onJustify: In serviceScope try block, before JustifyAppContent")
-                                    val response: String? = JustifyAppContent(packageName, entry) // Network/DB call
+                                    val response: String? = JustifyAppContent(packageName, entry, this@JustificationOverlayService) // Network/DB call
                                     Log.d("JustificationPrompt", "onJustify: API Response: $response")
 
                                     val parts = response?.split(":", limit = 2)
@@ -238,6 +253,7 @@ class JustificationOverlayService : Service(), LifecycleOwner, ViewModelStoreOwn
                                         AppState.updateLastBlockedApp(packageName)
                                         successInScope = true
                                         shouldStopService = true
+                                        handleJustificationComplete(packageName)
                                     } else if (code == "DENY") {
                                         Log.w(TAG, "onJustify: Access DENIED. Reason: $message")
                                         errorMsgInScope = message ?: "Justification denied by server."
@@ -269,7 +285,7 @@ class JustificationOverlayService : Service(), LifecycleOwner, ViewModelStoreOwn
                                             }
                                             if (shouldStopService) {
                                                 Log.d(TAG, "onJustify: Main thread - stopping service.")
-                                                stopSelf()
+//                                                stopSelf()
                                             }
                                             Log.d(TAG, "onJustify: Finished Main thread operations.")
                                         } catch (e: Exception) {
@@ -296,8 +312,9 @@ class JustificationOverlayService : Service(), LifecycleOwner, ViewModelStoreOwn
                         onCancel = {
                             AppState.updateLastBlockedApp(packageName)
                             Log.i(TAG, "Justification canceled for $packageName")
+                            handleJustificationComplete(packageName = packageName)
                             removeOverlay()
-                            stopSelf() // Stop the service after action
+//                            stopSelf() // Stop the service after action
                         }
                     )
                 }

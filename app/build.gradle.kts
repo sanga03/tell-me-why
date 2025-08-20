@@ -80,5 +80,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.6.2") // Or latest
     implementation("com.google.accompanist:accompanist-drawablepainter:0.32.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.0") // Use the latest stable version
+    implementation("androidx.datastore:datastore-preferences:1.1.1") // Or the latest version
+    implementation("com.google.code.gson:gson:2.10.1")
 // Use the latest version
 }

@@ -2,35 +2,77 @@ package com.tellmewhy.presentation.ui.overlay
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
+import android.annotation.SuppressLint
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.SharedPreferences
 import android.os.Build
 import android.provider.Settings
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
+import androidx.core.content.ContextCompat
 import com.tellmewhy.data.AppState
-import com.tellmewhy.presentation.ui.overlay.JustificationOverlayService
+import com.tellmewhy.data.datastore.AppSettingsDataStore
+import kotlin.collections.toMutableMap
+import com.tellmewhy.common.JustificationEvents // Import your constants
 private const val TRACKED_APPS_PREFS_NAME = "TrackedAppsPrefs"
 class AppUsageAccessibilityService : AccessibilityService() {
 
     private val TAG = "AppUsageAccessibility"
-    private val TARGET_APPS = listOf(
-        "com.instagram.android",
-        "com.google.android.youtube",
-        "com.android.chrome",
-        "com.instagram.lite",
-        "app.revanced.android.youtube",
-        "com.reddit.frontpage",
-        "com.instagram.barcelona"
-        // Add other package names you want to track
-    )
 
+    private val justificationHandledReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == JustificationEvents.ACTION_JUSTIFICATION_HANDLED) {
+                val packageName = intent.getStringExtra(JustificationEvents.EXTRA_PACKAGE_NAME)
+                if (packageName != null) {
+                    Log.d(TAG, "Received justification handled event for: $packageName")
+                    updateAndSaveOverlayTimestamp(packageName)
+                    val serviceIntent = Intent(applicationContext, JustificationOverlayService::class.java)
+                    // Note: You don't need to put extras when just stopping the service,
+                    // but it doesn't hurt if the service's onStartCommand can handle null extras.
+                    stopService(serviceIntent)
+                }
+            }
+        }
+    }
 
     // Keep track of the last app that triggered the overlay to avoid re-triggering immediately
 //    private var lastBlockedApp: String? = null
-    private val COOLDOWN_PERIOD_MS = 2000 * 60 // 2 seconds
+    private var currentCooldownPeriodMs: Long = AppSettingsDataStore.DEFAULT_COOLDOWN_MINUTES * 60 * 1000L
+//    private val COOLDOWN_PERIOD_MS = AppSettingsDataStore.getCooldownTimeFlow(applicationContext) * 1000 * 60 // 2 seconds
     private lateinit var trackedAppsPrefs: SharedPreferences
+    private lateinit var lastOverlayTimeMillis: MutableMap<String, Long>
+
+    @SuppressLint("UnspecifiedRegisterReceiverFlag")
+    override fun onCreate() {
+        super.onCreate()
+        Log.d(TAG, "Service onCreate")
+        // Option A.1: Blocking load (simple but blocks onCreate momentarily)
+        val cooldownMinutes = AppSettingsDataStore.getCooldownTimeBlocking(applicationContext)
+        currentCooldownPeriodMs = cooldownMinutes * 60 * 1000L
+
+        // Load the timestamps when the service is created
+        // Using the blocking version here as onCreate is on the main thread
+        // and we need the data immediately for subsequent events.
+        lastOverlayTimeMillis = AppSettingsDataStore.getOverlayTimestampsBlocking(applicationContext).toMutableMap()
+        val intentFilter = IntentFilter(JustificationEvents.ACTION_JUSTIFICATION_HANDLED)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(justificationHandledReceiver, intentFilter, RECEIVER_EXPORTED) // Or RECEIVER_NOT_EXPORTED if appropriate
+        } else {
+            registerReceiver(justificationHandledReceiver, intentFilter)
+        }
+        Log.d(TAG, "JustificationHandledReceiver registered.")
+    }
+
+    private fun updateAndSaveOverlayTimestamp(packageName: String) {
+        val currentTime = System.currentTimeMillis()
+        lastOverlayTimeMillis[packageName] = currentTime
+        // Persist the change to DataStore
+        AppSettingsDataStore.saveOverlayTimestampsBlocking(applicationContext, lastOverlayTimeMillis)
+        Log.d(TAG, "Updated and saved overlay timestamp for $packageName via broadcast: $currentTime")
+    }
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
 
 
@@ -45,10 +87,11 @@ class AppUsageAccessibilityService : AccessibilityService() {
 
             if (packageName != null && initialTrackState) {
                 // Basic cooldown to prevent rapid re-triggering for the same app
-                if (packageName == AppState.lastBlockedAppPackageName &&
-                    (System.currentTimeMillis() - (lastOverlayTimeMillis[packageName]
-                        ?: 0) < COOLDOWN_PERIOD_MS)
-                ) {
+                val lastTime = lastOverlayTimeMillis[packageName] ?: 0L
+                if (((System.currentTimeMillis() - lastTime)
+                        ?: 0) < currentCooldownPeriodMs
+                )
+                 {
                     Log.d(TAG, "Cooldown active for $packageName, skipping overlay.")
                     return
                 }
@@ -72,10 +115,10 @@ class AppUsageAccessibilityService : AccessibilityService() {
                 // If permission is granted (or pre-M), proceed to start the service:
                 Log.i(TAG, "Target app opened: $packageName. Overlay permission appears granted. Attempting to show overlay.")
 //                val intent = Intent(this, JustificationOverlayService::class.java).apply { /* ... */ }
-                AppState.updateLastBlockedApp(packageName)
-
+//                lastOverlayTimeMillis[packageName] = System.currentTimeMillis()
+//                AppSettingsDataStore.saveOverlayTimestampsBlocking(applicationContext, lastOverlayTimeMillis)
                 // Update local map for cooldown specific to this service's logic
-                lastOverlayTimeMillis[packageName] = System.currentTimeMillis()
+
 
                 startService(intent)
             } else if (packageName != null && !initialTrackState  &&  packageName != "com.tellmewhy") {

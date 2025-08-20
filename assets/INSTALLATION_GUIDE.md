@@ -9,6 +9,23 @@
 
 **IMPORTANT: These instructions are primarily for installing developer builds or testing versions. Always exercise caution when disabling security features or installing apps from outside official stores. Ensure you trust the source of the APK.**
 
+
+
+## How to Get Your OpenRouter API Key
+
+To use TellMeWhy's LLM features, you need an OpenRouter API key. Follow these steps:
+
+1. Go to [https://openrouter.ai/](https://openrouter.ai/) in your browser.
+2. Sign up for an account or log in if you already have one.
+3. Once logged in, click your profile icon (top right) and select **API Keys** from the menu.
+4. Click **Create new key** and give it a name (e.g., "TellMeWhy").
+5. Copy the generated key to your clipboard.
+6. Open the TellMeWhy app, go to **Settings**, and paste your key into the OpenRouter API Key field. Tap **Save Key**.
+
+**Important:** Keep your API key private. Do not share it with others. Your key is stored only on your device and used for your requests.
+
+---
+
 ## Steps to Install
 
 ### Step 1: Download the APK File
