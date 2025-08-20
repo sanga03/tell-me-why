@@ -31,6 +31,7 @@ import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -219,7 +220,6 @@ fun MainScaffold(
                     onNavigateToAllLogs = onViewLogsClicked
                 )
                 Screen.SettingsScreen -> SettingsScreen(
-                    prefs = settingsPrefs,
                     isOverlayGranted = isOverlayPermissionGranted,
                     isAccessibilityEnabled = isAccessibilityServiceEnabled,
                     onRequestOverlayPermission = onRequestOverlayPermission,
@@ -232,9 +232,6 @@ fun MainScaffold(
 
 // Constants for SharedPreferences (as defined above)
 
-
-
-// --- AppListScreen Composable (Modified) ---
 @Composable
 fun AppListScreen(
     trackedAppsPrefs: SharedPreferences,
@@ -242,9 +239,9 @@ fun AppListScreen(
     isAccessibilityEnabled: Boolean
 ) {
     val context = LocalContext.current
-    var showSystemApps by remember { mutableStateOf(false) }
+    // var showSystemApps by remember { mutableStateOf(false) } // Keep this if you plan to use it
 
-    val priorityPackageNames = remember {
+    val priorityPackageNames = remember { // This list is stable, so simple remember is fine
         listOf(
             "com.instagram.android",
             "com.google.android.youtube",
@@ -256,55 +253,63 @@ fun AppListScreen(
         )
     }
 
-    val installedApps by remember { // Removed showSystemApps from remember key for now
-        derivedStateOf {
-            val pm = context.packageManager
-            val allApplications = pm.getInstalledApplications(PackageManager.GET_META_DATA)
-            Log.d("MainActivity", "Total applications found: ${allApplications.size}")
+    // State to hold the cached list of apps
+    var cachedInstalledApps by remember { mutableStateOf<List<AppDetail>>(emptyList()) }
+    // State to indicate if we are currently loading the apps
+    var isLoadingApps by remember { mutableStateOf(true) }
 
-            val (priorityApps, otherApps) = allApplications
-                .filter { appInfo ->
-                    // Your existing filter logic for user-launchable apps
-                    val isSystemApp = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
-                    val isUpdatedSystemApp = (appInfo.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
-                    val hasLaunchIntent = pm.getLaunchIntentForPackage(appInfo.packageName) != null
+    // LaunchedEffect to load apps when the composable enters the composition
+    // and potentially when specific keys change (e.g., showSystemApps if it affects filtering)
+    // For now, we'll load it once. If you add filtering based on showSystemApps, add it as a key.
+    LaunchedEffect(Unit) { // Key 'Unit' means it runs once on initial composition
+        isLoadingApps = true
+        // Perform the potentially long-running task in a background coroutine
+        // Note: PackageManager calls are typically main-thread safe and fast enough
+        // for most app lists, but for extreme cases or if you add more processing,
+        // you might consider withContext(Dispatchers.IO) for parts of it.
+        // However, be cautious as UI elements (like loadIcon) might need the main thread.
+        // For this case, direct execution is likely fine.
 
-                    if (!hasLaunchIntent) {
-                        return@filter false
-                    }
-                    !isSystemApp || isUpdatedSystemApp
+        val pm = context.packageManager
+        val allApplications = pm.getInstalledApplications(PackageManager.GET_META_DATA)
+        Log.d("AppListScreen", "Fetching all applications. Count: ${allApplications.size}")
+
+        val (priorityApps, otherApps) = allApplications
+            .filter { appInfo ->
+                val isSystemApp = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
+                val isUpdatedSystemApp = (appInfo.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
+                val hasLaunchIntent = pm.getLaunchIntentForPackage(appInfo.packageName) != null
+
+                if (!hasLaunchIntent) {
+                    return@filter false
                 }
-                .mapNotNull { appInfo ->
-                    try {
-                        AppDetail(
-                            appName = appInfo.loadLabel(pm).toString(),
-                            packageName = appInfo.packageName,
-                            icon = appInfo.loadIcon(pm)
-                        )
-                    } catch (e: Exception) {
-                        Log.e("AppListDebug", "Failed to map app: ${appInfo.packageName}", e)
-                        // Fallback with a placeholder or skip if icon loading fails critically
-                        AppDetail(
-                            appName = appInfo.loadLabel(pm).toString(),
-                            packageName = appInfo.packageName,
-                            icon = null // Or some default icon
-                        )
-                    }
+                // Apply showSystemApps filter here if you re-introduce it
+                // if (showSystemApps) true else (!isSystemApp || isUpdatedSystemApp)
+                !isSystemApp || isUpdatedSystemApp // Current logic
+            }
+            .mapNotNull { appInfo ->
+                try {
+                    AppDetail(
+                        appName = appInfo.loadLabel(pm).toString(),
+                        packageName = appInfo.packageName,
+                        icon = appInfo.loadIcon(pm)
+                    )
+                } catch (e: Exception) {
+                    Log.e("AppListScreen", "Failed to map app: ${appInfo.packageName}", e)
+                    // Consider a placeholder or skipping
+                    null // Or fallback AppDetail
                 }
-                .partition { appDetail -> // Partition the list
-                    appDetail.packageName in priorityPackageNames
-                }
+            }
+            .partition { appDetail ->
+                appDetail.packageName in priorityPackageNames
+            }
 
-            // Sort each list alphabetically by appName before combining
-            val sortedPriorityApps = priorityApps.sortedBy { it.appName.lowercase() }
-            val sortedOtherApps = otherApps.sortedBy { it.appName.lowercase() }
+        val sortedPriorityApps = priorityApps.sortedBy { it.appName.lowercase() }
+        val sortedOtherApps = otherApps.sortedBy { it.appName.lowercase() }
 
-            // Combine the lists: priority apps first, then other apps
-            val finalList = sortedPriorityApps + sortedOtherApps
-            Log.d("MainActivity", "Priority apps: ${sortedPriorityApps.joinToString { it.packageName }}")
-            Log.d("MainActivity", "Final list size: ${finalList.size}")
-            finalList
-        }
+        cachedInstalledApps = sortedPriorityApps + sortedOtherApps
+        isLoadingApps = false
+        Log.d("AppListScreen", "Final app list processed. Size: ${cachedInstalledApps.size}")
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -320,25 +325,37 @@ fun AppListScreen(
             }
         }
 
-        if (installedApps.isEmpty()) {
-            Box(modifier = Modifier
-                .fillMaxSize()
-                .weight(1f)
-                .padding(16.dp), contentAlignment = Alignment.Center) {
-                Text("Loading apps or no filterable apps found.")
+        if (isLoadingApps) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .weight(1f)
+                    .padding(16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator() // Show a loading indicator
+                Text("Loading apps...", modifier = Modifier.padding(top = 70.dp))
+            }
+        } else if (cachedInstalledApps.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .weight(1f)
+                    .padding(16.dp), contentAlignment = Alignment.Center
+            ) {
+                Text("No filterable apps found.")
             }
         } else {
             LazyColumn(
-                modifier = Modifier.weight(1f) // Ensure LazyColumn takes available space
+                modifier = Modifier.weight(1f)
             ) {
-                items(installedApps, key = { it.packageName }) { appDetail ->
+                items(cachedInstalledApps, key = { it.packageName }) { appDetail ->
                     AppListItem(
                         appDetail = appDetail,
                         initialTrackState = trackedAppsPrefs.getBoolean(appDetail.packageName, false),
                         onTrackStateChanged = { packageName, isTracked ->
                             trackedAppsPrefs.edit().putBoolean(packageName, isTracked).apply()
                         },
-                        // Disable switch if core permissions are missing
                         enabled = isOverlayGranted && isAccessibilityEnabled
                     )
                     Divider()
@@ -347,6 +364,7 @@ fun AppListScreen(
         }
     }
 }
+
 
 // --- AppListItem Composable (Modified) ---
 @Composable

@@ -10,7 +10,9 @@ import android.provider.Settings
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import com.tellmewhy.data.AppState
-import com.tellmewhy.presentation.ui.overlay.JustificationOverlayService
+import com.tellmewhy.data.datastore.AppSettingsDataStore
+import kotlin.collections.toMutableMap
+
 private const val TRACKED_APPS_PREFS_NAME = "TrackedAppsPrefs"
 class AppUsageAccessibilityService : AccessibilityService() {
 
@@ -29,8 +31,23 @@ class AppUsageAccessibilityService : AccessibilityService() {
 
     // Keep track of the last app that triggered the overlay to avoid re-triggering immediately
 //    private var lastBlockedApp: String? = null
-    private val COOLDOWN_PERIOD_MS = 2000 * 60 // 2 seconds
+    private var currentCooldownPeriodMs: Long = AppSettingsDataStore.DEFAULT_COOLDOWN_MINUTES * 60 * 1000L
+//    private val COOLDOWN_PERIOD_MS = AppSettingsDataStore.getCooldownTimeFlow(applicationContext) * 1000 * 60 // 2 seconds
     private lateinit var trackedAppsPrefs: SharedPreferences
+    private lateinit var lastOverlayTimeMillis: MutableMap<String, Long>
+    override fun onCreate() {
+        super.onCreate()
+        Log.d(TAG, "Service onCreate")
+        // Option A.1: Blocking load (simple but blocks onCreate momentarily)
+        val cooldownMinutes = AppSettingsDataStore.getCooldownTimeBlocking(applicationContext)
+        currentCooldownPeriodMs = cooldownMinutes * 60 * 1000L
+
+        // Load the timestamps when the service is created
+        // Using the blocking version here as onCreate is on the main thread
+        // and we need the data immediately for subsequent events.
+        lastOverlayTimeMillis = AppSettingsDataStore.getOverlayTimestampsBlocking(applicationContext).toMutableMap()
+        Log.d(TAG, "Loaded initial overlay timestamps: $lastOverlayTimeMillis")
+    }
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
 
 
@@ -45,10 +62,11 @@ class AppUsageAccessibilityService : AccessibilityService() {
 
             if (packageName != null && initialTrackState) {
                 // Basic cooldown to prevent rapid re-triggering for the same app
-                if (packageName == AppState.lastBlockedAppPackageName &&
-                    (System.currentTimeMillis() - (lastOverlayTimeMillis[packageName]
-                        ?: 0) < COOLDOWN_PERIOD_MS)
-                ) {
+                val lastTime = lastOverlayTimeMillis[packageName] ?: 0L
+                if (((System.currentTimeMillis() - lastTime)
+                        ?: 0) < currentCooldownPeriodMs
+                )
+                 {
                     Log.d(TAG, "Cooldown active for $packageName, skipping overlay.")
                     return
                 }
@@ -72,10 +90,10 @@ class AppUsageAccessibilityService : AccessibilityService() {
                 // If permission is granted (or pre-M), proceed to start the service:
                 Log.i(TAG, "Target app opened: $packageName. Overlay permission appears granted. Attempting to show overlay.")
 //                val intent = Intent(this, JustificationOverlayService::class.java).apply { /* ... */ }
-                AppState.updateLastBlockedApp(packageName)
-
-                // Update local map for cooldown specific to this service's logic
                 lastOverlayTimeMillis[packageName] = System.currentTimeMillis()
+                AppSettingsDataStore.saveOverlayTimestampsBlocking(applicationContext, lastOverlayTimeMillis)
+                // Update local map for cooldown specific to this service's logic
+
 
                 startService(intent)
             } else if (packageName != null && !initialTrackState  &&  packageName != "com.tellmewhy") {
